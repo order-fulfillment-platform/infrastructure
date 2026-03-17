@@ -1,0 +1,165 @@
+services:
+    order-postgres:
+        image: postgres:16
+        container_name: order-postgres
+        environment:
+            POSTGRES_DB: order_db
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+        ports:
+            - "5432:5432"
+        volumes:
+            - order_postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: "pg_isready -U postgres"
+            interval: 10s
+            timeout: 5s
+            retries: 5    
+    inventory-postgres:
+        image: postgres:16
+        container_name: inventory-postgres
+        environment:
+            POSTGRES_DB: inventory_db
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+        ports:
+            - "5433:5432"
+        volumes:
+            - inventory_postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: "pg_isready -U postgres"
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    payment-postgres:
+        image: postgres:16
+        container_name: payment-postgres
+        environment:
+            POSTGRES_DB: payment_db
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+        ports:
+            - "5434:5432"
+        volumes:
+            - payment_postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: "pg_isready -U postgres"
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            
+    zookeeper:
+        image: confluentinc/cp-zookeeper:7.6.0
+        container_name: ofp-zookeeper
+        environment:
+            ZOOKEEPER_CLIENT_PORT: 2181
+            ZOOKEEPER_TICK_TIME: 2000
+        volumes:
+            - zookeeper_data:/var/lib/zookeeper/data
+        healthcheck:
+            test: "echo ruok | nc localhost 2181 | grep imok"
+            interval: 10s
+            timeout: 5s
+            retries: 5
+    kafka:
+        image: confluentinc/cp-kafka:7.6.0
+        container_name: ofp-kafka
+        depends_on:
+            - zookeeper
+        ports:
+            - "9092:9092"
+        environment:
+            KAFKA_BROKER_ID: 1
+            KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+        volumes:
+            - kafka_data:/var/lib/kafka/data
+        healthcheck:
+            test: "kafka-topics --bootstrap-server localhost:9092 --list"
+            interval: 15s
+            timeout: 10s
+            retries: 5
+
+    order-service:
+        build:
+            context: ./order-service
+        container_name: order-service
+        ports:
+            - "8081:8081"
+        environment:
+            SPRING_DATASOURCE_URL: jdbc:postgresql://order-postgres:5432/order_db
+            SPRING_DATASOURCE_USERNAME: postgres
+            SPRING_DATASOURCE_PASSWORD: postgres
+            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+        depends_on:
+            order-postgres:
+                condition: service_healthy
+            kafka:
+                condition: service_healthy
+    
+    inventory-service:
+        build:
+            context: ./inventory-service
+        container_name: inventory-service
+        ports:
+            - "8082:8082"
+        environment:
+            SPRING_DATASOURCE_URL: jdbc:postgresql://inventory-postgres:5432/inventory_db
+            SPRING_DATASOURCE_USERNAME: postgres
+            SPRING_DATASOURCE_PASSWORD: postgres
+            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+        depends_on:
+            inventory-postgres:
+                condition: service_healthy
+            kafka:
+                condition: service_healthy
+
+    payment-service:
+        build:
+            context: ./payment-service
+        container_name: payment-service
+        ports:
+            - "8083:8083"
+        environment:
+            SPRING_DATASOURCE_URL: jdbc:postgresql://payment-postgres:5432/payment_db
+            SPRING_DATASOURCE_USERNAME: postgres
+            SPRING_DATASOURCE_PASSWORD: postgres
+            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+        depends_on:
+            payment-postgres:
+                condition: service_healthy
+            kafka:
+                condition: service_healthy
+
+    notification-service:
+        build:
+            context: ./notification-service
+        container_name: notification-service
+        ports:
+            - "8084:8084"
+        environment:
+            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+        depends_on:
+            kafka:
+                condition: service_healthy
+    
+    api-gateway:
+        build:
+            context: ./api-gateway
+        container_name: api-gateway
+        ports:
+            - "8080:8080"
+        depends_on:
+            - order-service
+            - inventory-service
+            - payment-service
+
+volumes:
+    order_postgres_data:
+    inventory_postgres_data:
+    payment_postgres_data:
+    zookeeper_data:
+    kafka_data:
+        
