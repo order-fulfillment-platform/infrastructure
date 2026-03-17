@@ -8,7 +8,7 @@
     Docker Compose infrastructure configuration for the Order Fulfillment Platform, an event-driven microservices system built with Spring Boot 3, Apache Kafka and PostgreSQL.
     <br />
     <br />
-    <a href="https://github.com/OrderFulfillmentPlatform">View Organization</a>
+    <a href="https://github.com/order-fulfillment-platform">View Organization</a>
   </p>
 </div>
 
