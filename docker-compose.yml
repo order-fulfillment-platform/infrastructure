@@ -15,6 +15,7 @@ services:
             interval: 10s
             timeout: 5s
             retries: 5    
+            
     inventory-postgres:
         image: postgres:16
         container_name: inventory-postgres
@@ -84,7 +85,7 @@ services:
 
     order-service:
         build:
-            context: ./order-service
+            context: ../order-service
         container_name: order-service
         ports:
             - "8081:8081"
@@ -101,7 +102,7 @@ services:
     
     inventory-service:
         build:
-            context: ./inventory-service
+            context: ../inventory-service
         container_name: inventory-service
         ports:
             - "8082:8082"
@@ -118,7 +119,7 @@ services:
 
     payment-service:
         build:
-            context: ./payment-service
+            context: ../payment-service
         container_name: payment-service
         ports:
             - "8083:8083"
@@ -135,7 +136,7 @@ services:
 
     notification-service:
         build:
-            context: ./notification-service
+            context: ../notification-service
         container_name: notification-service
         ports:
             - "8084:8084"
@@ -147,7 +148,7 @@ services:
     
     api-gateway:
         build:
-            context: ./api-gateway
+            context: ../api-gateway
         container_name: api-gateway
         ports:
             - "8080:8080"
@@ -155,11 +156,39 @@ services:
             - order-service
             - inventory-service
             - payment-service
-
+            
+    prometheus:
+        image: prom/prometheus:v2.51.0
+        container_name: ofp-prometheus
+        ports:
+            - "9090:9090"
+        volumes:
+            - ./prometheus.yml:/etc/prometheus/prometheus.yml
+            - prometheus_data:/prometheus
+        depends_on:
+            - order-service
+            - inventory-service
+            - payment-service
+            - notification-service
+            - api-gateway
+            
+    grafana:
+        image: grafana/grafana:10.4.0
+        container_name: ofp-grafana
+        ports:
+            - "3000:3000"
+        environment:
+            GF_SECURITY_ADMIN_PASSWORD: admin
+        volumes:
+            - grafana_data:/var/lib/grafana
+        depends_on:
+            - prometheus
 volumes:
     order_postgres_data:
     inventory_postgres_data:
     payment_postgres_data:
     zookeeper_data:
     kafka_data:
+    prometheus_data:
+    grafana_data:
         
