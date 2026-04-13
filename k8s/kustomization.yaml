@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ofp
+
+images:
+  - name: order-service
+    newTag: 1.0.0
+  - name: inventory-service
+    newTag: 1.0.0
+  - name: payment-service
+    newTag: 1.0.0
+  - name: notification-service
+    newTag: 1.0.0
+
+resources:
+  - postgres/order-postgres.yaml
+  - postgres/inventory-postgres.yaml
+  - postgres/payment-postgres.yaml
+  - kafka/kafka.yaml
+  - services/order-service.yaml
+  - services/inventory-service.yaml
+  - services/payment-service.yaml
+  - services/notification-service.yaml
+  - services/api-gateway.yaml

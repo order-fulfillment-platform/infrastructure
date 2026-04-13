@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: payment-postgres-secret
+  namespace: ofp
+type: Opaque
+stringData:
+  username: postgres
+  password: postgres
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: payment-postgres-pvc
+  namespace: ofp
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-postgres
+  namespace: ofp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-postgres
+  template:
+    metadata:
+      labels:
+        app: payment-postgres
+    spec:
+      containers:
+        - name: payment-postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+              - name: POSTGRES_DB
+                value: payment_db
+              - name: POSTGRES_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: payment-postgres-secret
+                    key: username
+              - name: POSTGRES_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: payment-postgres-secret
+                    key: password
+          volumeMounts:
+            - name: payment-postgres-storage
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: payment-postgres-storage
+          persistentVolumeClaim:
+            claimName: payment-postgres-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-postgres
+  namespace: ofp
+spec:
+  selector:
+    app: payment-postgres
+  ports: 
+    - port: 5432
+      targetPort: 5432
+
+
+                
