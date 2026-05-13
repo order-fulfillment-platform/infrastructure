@@ -20,9 +20,9 @@ services:
         image: postgres:16
         container_name: inventory-postgres
         environment:
-            POSTGRES_DB: inventory_db
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: postgres
+            POSTGRES_DB: ${INVENTORY_DB}
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
         ports:
             - "5433:5432"
         volumes:
@@ -37,13 +37,30 @@ services:
         image: postgres:16
         container_name: payment-postgres
         environment:
-            POSTGRES_DB: payment_db
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: postgres
+            POSTGRES_DB: ${PAYMENT_DB}
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
         ports:
             - "5434:5432"
         volumes:
             - payment_postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: "pg_isready -U postgres"
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    user-postgres:
+        image: postgres:16
+        container_name: user-postgres
+        environment:
+            POSTGRES_DB: ${USER_DB}
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        ports:
+            - "5435:5432"
+        volumes:
+            - user_postgres_data:/var/lib/postgresql/data
         healthcheck:
             test: "pg_isready -U postgres"
             interval: 10s
@@ -90,10 +107,10 @@ services:
         ports:
             - "8081:8081"
         environment:
-            SPRING_DATASOURCE_URL: jdbc:postgresql://order-postgres:5432/order_db
-            SPRING_DATASOURCE_USERNAME: postgres
-            SPRING_DATASOURCE_PASSWORD: postgres
-            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+            DATASOURCE_URL: jdbc:postgresql://order-postgres:5432/${ORDER_DB}
+            DATASOURCE_USERNAME: ${POSTGRES_USER}
+            DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+            KAFKA_BOOTSTRAP_SERVERS: kafka:9092
         depends_on:
             order-postgres:
                 condition: service_healthy
@@ -107,10 +124,10 @@ services:
         ports:
             - "8082:8082"
         environment:
-            SPRING_DATASOURCE_URL: jdbc:postgresql://inventory-postgres:5432/inventory_db
-            SPRING_DATASOURCE_USERNAME: postgres
-            SPRING_DATASOURCE_PASSWORD: postgres
-            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+            DATASOURCE_URL: jdbc:postgresql://inventory-postgres:5432/${INVENTORY_DB}
+            DATASOURCE_USERNAME: ${POSTGRES_USER}
+            DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+            KAFKA_BOOTSTRAP_SERVERS: kafka:9092
         depends_on:
             inventory-postgres:
                 condition: service_healthy
@@ -124,10 +141,10 @@ services:
         ports:
             - "8083:8083"
         environment:
-            SPRING_DATASOURCE_URL: jdbc:postgresql://payment-postgres:5432/payment_db
-            SPRING_DATASOURCE_USERNAME: postgres
-            SPRING_DATASOURCE_PASSWORD: postgres
-            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+            DATASOURCE_URL: jdbc:postgresql://payment-postgres:5432/${PAYMENT_DB}
+            DATASOURCE_USERNAME: ${POSTGRES_USER}
+            DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+            KAFKA_BOOTSTRAP_SERVERS: kafka:9092
         depends_on:
             payment-postgres:
                 condition: service_healthy
@@ -141,9 +158,25 @@ services:
         ports:
             - "8084:8084"
         environment:
-            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+            KAFKA_BOOTSTRAP_SERVERS: kafka:9092
         depends_on:
             kafka:
+                condition: service_healthy
+                
+    user-service:
+        build:
+            context: ../user-service
+        container_name: user-service
+        ports:
+            - "8085:8085"
+        environment:
+            DATASOURCE_URL: jdbc:postgresql://user-postgres:5432/${USER_DB}
+            DATASOURCE_USERNAME: ${POSTGRES_USER}
+            DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+            JWT_SECRET: ${JWT_SECRET}
+            JWT_EXPIRATION: ${JWT_EXPIRATION}
+        depends_on:
+            user-postgres:
                 condition: service_healthy
     
     api-gateway:
@@ -152,10 +185,13 @@ services:
         container_name: api-gateway
         ports:
             - "8080:8080"
+        environment:
+            JWT_SECRET: ${JWT_SECRET}
         depends_on:
             - order-service
             - inventory-service
             - payment-service
+            - user-service
             
     prometheus:
         image: prom/prometheus:v2.51.0
@@ -187,6 +223,7 @@ volumes:
     order_postgres_data:
     inventory_postgres_data:
     payment_postgres_data:
+    user_postgres_data:
     zookeeper_data:
     kafka_data:
     prometheus_data:
